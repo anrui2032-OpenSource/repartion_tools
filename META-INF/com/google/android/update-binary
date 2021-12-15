@@ -1,0 +1,65 @@
+#!/sbin/sh
+# Author: cjybyjk (cjybyjk@gmail.com)
+# Author: anrui2032 (anrui2032@gmail.com)
+
+OUTFD=$2
+ZIP=$3
+
+BYNAME="/dev/block/bootdevice/by-name"
+DISK="/dev/block/mmcblk0"
+DEVICE=`getprop ro.product.device`
+SGDISK="/tmp/treblizer/sgdisk"
+VENDOR=`ls ${BYNAME}/vendor | grep -c vendor`
+
+ui_print() {
+    echo -n -e "ui_print $1\n" >> /proc/self/fd/$OUTFD
+    echo -n -e "ui_print\n" >> /proc/self/fd/$OUTFD
+}
+
+ui_print " "
+ui_print "#######################################"
+ui_print "    Smartisan Osborn Treblizer Tool"
+ui_print "    Create a Vendor Partition"
+ui_print "    Author: cjybyjk & anrui2032"
+ui_print "#######################################"
+ui_print " "
+
+ui_print "-Checking device ..."
+if [ ${DEVICE} != osborn ]; then
+    ui_print "-This package is for device: osborn; this device is ${DEVICE}"
+    ui_print "-Unsupported device !"
+    exit 1
+fi
+
+ui_print "-Extracting Files ..."
+mkdir /tmp/treblizer
+cd /tmp/treblizer
+unzip -o "${ZIP}"
+chmod 0755 ${SGDISK}
+
+ui_print "-Checking partition ..."
+if [ ${VENDOR} != 0 ] ; then
+    ui_print "-Vendor partition is created !"
+    rm -rf /tmp/treblizer
+    exit 0
+fi
+
+safeRunCommand() {
+   cmnd="$@"
+   $cmnd
+}
+
+ui_print "-Repartion Starting ..."
+safeRunCommand "e2fsck -y -f ${BYNAME}/system"
+safeRunCommand "resize2fs ${BYNAME}/system 6291455"
+safeRunCommand "${SGDISK} ${DISK} --resize-treble=50"
+safeRunCommand "${SGDISK} ${DISK} --delete 43"
+safeRunCommand "${SGDISK} ${DISK} --new=43:1703936:7995391"
+safeRunCommand "${SGDISK} ${DISK} --change-name=43:system"
+safeRunCommand "${SGDISK} ${DISK} --new=50:7995392:9043967"
+safeRunCommand "${SGDISK} ${DISK} --change-name=50:vendor"
+safeRunCommand "mke2fs -t ext4 ${BYNAME}/vendor"
+ui_print "-Repartion Done ..."
+rm -rf /tmp/treblizer
+
+exit 0
